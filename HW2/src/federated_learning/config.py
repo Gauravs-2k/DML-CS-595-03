@@ -17,10 +17,16 @@ class Config:
         'max_workers': 8,             
         'epochs_per_round': 3,        
         'num_rounds': 15,              
-        'learning_rate': 0.001,        
+        'learning_rate': 0.01,        
         'device': 'auto',               
         'batch_size': 32,              
-        'random_seed': 42              
+        'random_seed': 42,
+        'optimizer': 'sgd',
+        'momentum': 0.9,
+        'weight_decay': 5e-4,
+        'nesterov': True,
+        'lr_scheduler_step': 3,
+        'lr_scheduler_gamma': 0.5     
     }
 
     def __init__(self, **kwargs):

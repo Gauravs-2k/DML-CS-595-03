@@ -27,8 +27,13 @@ class DataHandler:
         self.test_loader = None
         self.client_data = {}
 
-        # Setup data transforms
-        self.transform = transforms.Compose([
+        self.train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        self.test_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
@@ -40,17 +45,17 @@ class DataHandler:
         # Load dataset
         if self.dataset_name == "CIFAR10":
             self.train_dataset = datasets.CIFAR10(
-                root='./data', train=True, download=True, transform=self.transform
+                root='./data', train=True, download=True, transform=self.train_transform
             )
             self.test_dataset = datasets.CIFAR10(
-                root='./data', train=False, download=True, transform=self.transform
+                root='./data', train=False, download=True, transform=self.test_transform
             )
         elif self.dataset_name == "CIFAR100":
             self.train_dataset = datasets.CIFAR100(
-                root='./data', train=True, download=True, transform=self.transform
+                root='./data', train=True, download=True, transform=self.train_transform
             )
             self.test_dataset = datasets.CIFAR100(
-                root='./data', train=False, download=True, transform=self.transform
+                root='./data', train=False, download=True, transform=self.test_transform
             )
 
         # Create test loader
@@ -78,19 +83,33 @@ class DataHandler:
         client_data_indices = defaultdict(list)
 
         for class_id in range(self.num_classes):
-            # Use Dirichlet distribution to create non-uniform allocation
             proportions = np.random.dirichlet(np.repeat(0.5, self.num_clients))
             class_data = class_indices[class_id]
             np.random.shuffle(class_data)
 
-            # Distribute class data among clients based on proportions
+            class_counts = np.random.multinomial(len(class_data), proportions)
+
             start_idx = 0
-            for client_id in range(self.num_clients):
-                end_idx = start_idx + int(len(class_data) * proportions[client_id])
-                client_data_indices[client_id].extend(class_data[start_idx:end_idx])
+            for client_id, count in enumerate(class_counts):
+                end_idx = start_idx + count
+                if count > 0:
+                    client_data_indices[client_id].extend(class_data[start_idx:end_idx])
                 start_idx = end_idx
 
-        # Create Subset objects for each client
+        empty_clients = [cid for cid, indices in client_data_indices.items() if len(indices) == 0]
+        if empty_clients:
+            donor_clients = sorted(
+                client_data_indices.items(),
+                key=lambda item: len(item[1]),
+                reverse=True
+            )
+
+            for empty_client in empty_clients:
+                for donor_client, donor_indices in donor_clients:
+                    if len(donor_indices) > 1:
+                        client_data_indices[empty_client].append(donor_indices.pop())
+                        break
+
         self.client_data = {}
         for client_id in range(self.num_clients):
             self.client_data[client_id] = Subset(
@@ -98,12 +117,10 @@ class DataHandler:
                 client_data_indices[client_id]
             )
 
-        # Visualize data distribution
         self._visualize_data_distribution(client_data_indices)
 
     def _visualize_data_distribution(self, client_data_indices):
         """Visualize the data distribution across clients"""
-        # Create a matrix showing class distribution per client
         distribution_matrix = np.zeros((self.num_clients, self.num_classes))
 
         for client_id in range(self.num_clients):
@@ -112,7 +129,6 @@ class DataHandler:
                 label = self.train_dataset[idx][1]
                 distribution_matrix[client_id, label] += 1
 
-        # Plot heatmap
         plt.figure(figsize=(12, 8))
         sns.heatmap(distribution_matrix,
                    xticklabels=range(self.num_classes),

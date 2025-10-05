@@ -129,6 +129,27 @@ def get_prediction(model, image_tensor, class_names, device):
     return predictions
 
 
+def get_sample_images():
+    sample_dir = 'test'
+    if not os.path.exists(sample_dir):
+        return []
+    valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
+    files = []
+    for filename in sorted(os.listdir(sample_dir)):
+        if filename.lower().endswith(valid_extensions):
+            files.append(os.path.join(sample_dir, filename))
+    return files
+
+
+def set_current_image(image, name):
+    img = image.convert('RGB')
+    if 'current_image' in st.session_state:
+        del st.session_state['current_image']
+    st.session_state.current_image = img.copy()
+    st.session_state.current_image_name = name
+    st.session_state.predictions = None
+
+
 def main():
     st.set_page_config(
         page_title="Federated Learning Image Classifier",
@@ -166,51 +187,80 @@ def main():
     
     # Main content area
     col1, col2 = st.columns([1, 1])
+
+    sample_images = get_sample_images()
+    if 'current_image' not in st.session_state:
+        st.session_state.current_image = None
+        st.session_state.current_image_name = None
+    if 'predictions' not in st.session_state:
+        st.session_state.predictions = None
     
     with col1:
-        st.header("Upload Image")
-        
-        uploaded_file = st.file_uploader(
-            "Choose an image...",
-            type=['png', 'jpg', 'jpeg', 'gif', 'bmp'],
-            help="Upload an image to classify"
-        )
-        
-        if uploaded_file is not None:
-            # Display uploaded image
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_column_width=True)
-            
-            # Get prediction
-            if st.button("Classify Image", type="primary"):
-                with st.spinner("Processing image..."):
-                    try:
-                        # Preprocess and predict
-                        image_tensor = preprocess_image(image, transform)
-                        predictions = get_prediction(model, image_tensor, class_names, device)
-                        
-                        # Store predictions in session state
-                        st.session_state.predictions = predictions
-                        
-                    except Exception as e:
-                        st.error(f"Error during prediction: {e}")
+        st.header("Select Image")
+        source = st.radio("Image source", ["Upload", "Sample"], horizontal=True)
+        current_image = None
+        current_name = None
+        if source == "Upload":
+            uploaded_file = st.file_uploader(
+                "Choose an image...",
+                type=['png', 'jpg', 'jpeg', 'gif', 'bmp'],
+                help="Upload an image to classify"
+            )
+            if uploaded_file is not None:
+                image = Image.open(uploaded_file)
+                set_current_image(image, uploaded_file.name)
+        else:
+            if sample_images:
+                sample_names = [os.path.basename(path) for path in sample_images]
+                if 'selected_sample' not in st.session_state:
+                    st.session_state.selected_sample = sample_names[0]
+                    st.session_state.loaded_sample = None
+
+                selected_sample = st.selectbox(
+                    "Sample images",
+                    sample_names,
+                    index=sample_names.index(st.session_state.selected_sample)
+                )
+                st.session_state.selected_sample = selected_sample
+
+                needs_load = st.session_state.loaded_sample != selected_sample
+                if needs_load:
+                    sample_path = sample_images[sample_names.index(selected_sample)]
+                    image = Image.open(sample_path)
+                    set_current_image(image, selected_sample)
+                    st.session_state.loaded_sample = selected_sample
+            else:
+                st.info("No sample images available")
+
+        current_image = st.session_state.current_image
+        current_name = st.session_state.current_image_name
+
+        if current_image is not None:
+            st.image(current_image, caption=current_name, use_column_width=True)
+        classify_disabled = current_image is None
+        if st.button("Classify Image", type="primary", disabled=classify_disabled):
+            with st.spinner("Processing image..."):
+                try:
+                    image_tensor = preprocess_image(current_image, transform)
+                    predictions = get_prediction(model, image_tensor, class_names, device)
+                    st.session_state.predictions = predictions
+                except Exception as e:
+                    st.error(f"Error during prediction: {e}")
     
     with col2:
         st.header("Predictions")
         
-        if hasattr(st.session_state, 'predictions'):
+        if hasattr(st.session_state, 'predictions') and st.session_state.predictions:
             predictions = st.session_state.predictions
-            
-            # Show top prediction prominently
+
             top_pred = predictions[0]
             st.success(f"**Top Prediction: {top_pred['class']}** ({top_pred['percentage']:.1f}% confidence)")
-            
-            # Create confidence chart
+
             pred_df = pd.DataFrame(predictions)
-            
+
             fig = px.bar(
-                pred_df, 
-                x='percentage', 
+                pred_df,
+                x='percentage',
                 y='class',
                 orientation='h',
                 title="Confidence Scores",
@@ -220,8 +270,7 @@ def main():
             )
             fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
-            
-            # Show detailed predictions
+
             st.subheader("Detailed Results")
             for i, pred in enumerate(predictions):
                 with st.expander(f"{i+1}. {pred['class']} - {pred['percentage']:.1f}%"):

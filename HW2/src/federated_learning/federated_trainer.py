@@ -12,6 +12,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import time
 import copy
+from collections import OrderedDict
+import random
+import torch.backends.cudnn as cudnn
 
 from src.federated_learning.data_handler import DataHandler
 from src.federated_learning.model_utils import ModelUtils
@@ -40,7 +43,16 @@ class FederatedLearningSimulation:
         self.test_loader = None
         self.client_data = {}
 
-        # Set device
+        seed = self.config.get('random_seed')
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+            cudnn.deterministic = True
+            cudnn.benchmark = False
+
         device_str = self.config.get('device', 'auto')
         if device_str == "auto":
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -83,8 +95,31 @@ class FederatedLearningSimulation:
             shuffle=True
         )
 
-        optimizer = torch.optim.Adam(local_model.parameters(), lr=self.config.get('learning_rate'))
+        optimizer_name = self.config.get('optimizer', 'adam').lower()
+        if optimizer_name == 'sgd':
+            optimizer = torch.optim.SGD(
+                local_model.parameters(),
+                lr=self.config.get('learning_rate'),
+                momentum=self.config.get('momentum', 0.0),
+                weight_decay=self.config.get('weight_decay', 0.0),
+                nesterov=self.config.get('nesterov', False)
+            )
+        else:
+            optimizer = torch.optim.Adam(
+                local_model.parameters(),
+                lr=self.config.get('learning_rate'),
+                weight_decay=self.config.get('weight_decay', 0.0)
+            )
         criterion = nn.CrossEntropyLoss()
+
+        scheduler = None
+        scheduler_step = self.config.get('lr_scheduler_step')
+        if scheduler_step and scheduler_step > 0:
+            scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=scheduler_step,
+                gamma=self.config.get('lr_scheduler_gamma', 0.1)
+            )
 
         local_model.train()
         total_loss = 0.0
@@ -135,12 +170,22 @@ class FederatedLearningSimulation:
                     'batch_size': batch_samples
                 })
 
+            if scheduler is not None:
+                scheduler.step()
+
         avg_loss = total_loss / len(batch_logs) if batch_logs else 0.0
         avg_accuracy = total_correct / total_samples if total_samples > 0 else 0.0
 
+        model_state = {
+            key: value.detach().cpu()
+            for key, value in local_model.state_dict().items()
+        }
+
+        local_model.to('cpu')
+
         return {
             'client_id': client_id,
-            'model_weights': local_model.state_dict(),
+            'model_weights': model_state,
             'loss': avg_loss,
             'accuracy': avg_accuracy,
             'num_samples': len(self.client_data[client_id]),
@@ -155,14 +200,18 @@ class FederatedLearningSimulation:
         total_samples = sum(result['num_samples'] for result in client_results)
 
         # Weighted average based on number of samples
-        for result in client_results:
-            weight = result['num_samples'] / total_samples
-            client_weights = result['model_weights']
+        with torch.no_grad():
+            for result in client_results:
+                if result['num_samples'] == 0:
+                    continue
 
-            for key in client_weights:
-                if key not in aggregated_weights:
-                    aggregated_weights[key] = torch.zeros_like(client_weights[key])
-                aggregated_weights[key] += weight * client_weights[key]
+                weight = result['num_samples'] / total_samples
+                client_weights = result['model_weights']
+
+                for key in client_weights:
+                    if key not in aggregated_weights:
+                        aggregated_weights[key] = torch.zeros_like(client_weights[key])
+                    aggregated_weights[key] += weight * client_weights[key]
 
         return aggregated_weights
 
@@ -189,7 +238,10 @@ class FederatedLearningSimulation:
                 print(f"\n--- Round {round_num}/{num_rounds} ---")
 
                 # Get current global weights
-                global_weights = self.global_model.state_dict()
+                global_weights = OrderedDict(
+                    (key, value.detach().cpu())
+                    for key, value in self.global_model.state_dict().items()
+                )
 
                 # Submit local training jobs to executor
                 futures = []
@@ -198,7 +250,7 @@ class FederatedLearningSimulation:
                     future = executor.submit(
                         self.local_training_job,
                         client_id,
-                        copy.deepcopy(global_weights),
+                        global_weights,
                         round_num
                     )
                     futures.append(future)

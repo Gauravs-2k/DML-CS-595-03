@@ -6,51 +6,241 @@ This project implements a federated learning simulation for image classification
 
 The project consists of two main components:
 
-1. **Federated Learning Simulation**: A Python implementation using ThreadPoolExecutor to simulate 64+ devices training a global model collaboratively
-2. **Web Application**: A Streamlit-based interface for uploading images and getting predictions from the trained model
+✅ Federated Learning Simulation: COMPLETED - A Python implementation using ThreadPoolExecutor to simulate 16 devices training a global model collaboratively (achieved 73.40% accuracy)
 
-### Option 1: Using Docker (Recommended for Chameleon Cloud)
+🔄 Web Application: IN PROGRESS - A Streamlit-based interface for uploading images and getting predictions from the trained model
 
-1. **Build the Docker image:**
-   ```bash
-   docker build -t federated-learning-app .
-   ```
+## 📋 Current Status
 
-2. **Run with Streamlit (Default):**
-   ```bash
-   docker run -p 8501:8501 federated-learning-app
-   ```
+✅ COMPLETED Components
+- Federated Learning Training - 16 clients, 15 rounds, 73.40% final accuracy
+- Model Saved - models/federated_model_alexnet_CIFAR10.pth
+- Training Data Export - CSV files with all required columns
+- Streamlit App - Working locally for inference
+- Data Visualizations - Training curves and data distribution plots
 
-### Option 2: Running Locally
+🔄 TODO Components (Due Tomorrow 11:59 PM)
+- Docker Containerization - Package Streamlit app for deployment
+- Chameleon Cloud Deployment - Deploy container with floating IP access
+- IEEE Report - 2-page academic paper with results
+- Final Submission - Package all deliverables
 
-1. **Create and activate virtual environment:**
-   ```bash
-   # Create virtual environment
-   python3 -m venv venv
-   
-   # Activate virtual environment
-   source venv/bin/activate
-   ```
-   *Note: Your prompt should show `(venv)` when activated. Use `deactivate` to exit.*
+## 🚀 Quick Start
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Option 1: Local Testing (WORKING)
+Run Streamlit interface:
 
-3. **Run federated learning simulation:**
-   ```bash
-   # Option A: Run directly (recommended)
-   python src/federated_learning/fl_simulation.py
-   
-   # Option B: Run as module
-   python -m src.federated_learning.fl_simulation
-   ```
+```bash
+# Activate virtual environment
+source venv/bin/activate
 
-4. **Start Streamlit web application:**
-   ```bash
-   streamlit run src/web_app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
-   ```
+# Start Streamlit app
+streamlit run src/web_app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+Access at: http://localhost:8501
+
+### Option 2: Docker Deployment (NEEDS COMPLETION)
+Build Docker image:
+
+```bash
+docker build -t federated-inference .
+```
+
+Run container:
+
+```bash
+docker run -p 8501:8501 federated-inference
+```
+
+## 🐳 Updated Dockerfile (Inference Only)
+
+```dockerfile
+# Use Python 3.11 slim image
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY src/web_app/streamlit_app.py ./
+COPY models/ ./models/
+COPY static/ ./static/
+COPY data/ ./data/
+
+# Expose Streamlit port
+EXPOSE 8501
+
+# Health check
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
+
+# Run Streamlit app (inference only)
+CMD ["streamlit", "run", "streamlit_app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+```
+
+## 🌐 Chameleon Cloud Deployment Steps
+
+### 1. Prerequisites
+- Reserve Chameleon Cloud lease with Floating IP
+- Use CC-Ubuntu20.04 image
+- Configure security groups for port 8501
+
+### 2. Install Docker on Chameleon
+
+```bash
+# SSH into Chameleon instance
+ssh cc@<your-floating-ip>
+
+# Install Docker
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y docker.io
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker $USER
+
+# Re-login to apply docker group
+exit && ssh cc@<your-floating-ip>
+```
+
+### 3. Deploy Application
+
+```bash
+# Upload your project files
+scp -r HW2/ cc@<your-floating-ip>:~
+
+# SSH and deploy
+ssh cc@<your-floating-ip>
+cd HW2
+
+# Build and run
+docker build -t federated-inference .
+docker run -d -p 8501:8501 --name fl-app federated-inference
+
+# Verify deployment
+docker ps
+docker logs fl-app
+```
+
+### 4. Test Remote Access
+Access at: http://<your-floating-ip>:8501
+
+Take screenshot for IEEE report
+
+## 🤖 Federated Learning Results (COMPLETED)
+
+### Training Configuration
+
+```python
+config = {
+    'num_clients': 16,           # ✅ Meets requirement (≥16)
+    'dataset_name': 'CIFAR10',   # ✅ Standard dataset
+    'model_name': 'alexnet',     # ✅ ImageNet architecture adapted
+    'max_workers': 8,            # ✅ ThreadPoolExecutor
+    'epochs_per_round': 3,       # ✅ Local training epochs
+    'num_rounds': 15,            # ✅ Communication rounds
+    'learning_rate': 0.01        # ✅ Optimized learning rate
+}
+```
+
+### Training Results
+- Initial Accuracy: 10.00% (random baseline)
+- Final Accuracy: 73.40% (excellent performance)
+- Training Time: ~45 minutes on GPU
+- Data Records: 70,740 training logs exported
+
+### Required Data Export ✅
+
+The `data/training_results.csv` contains all required columns:
+
+```
+time,round,batch_num,client_id,train_loss,train_acc
+2025-10-05 14:00:00,1,0,0,1.6236,0.41
+2025-10-05 14:00:01,1,1,1,1.5892,0.43
+...
+```
+
+## 🌐 Streamlit Interface Features
+
+### Working Features ✅
+- Image Upload: Drag-and-drop interface for PNG, JPG, JPEG, GIF, BMP
+- Model Inference: Real-time predictions on uploaded images
+- CIFAR-10 Classes: Airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck
+- Training Analytics: Interactive charts showing federated learning progress
+- Model Information: Architecture details and performance metrics
+
+### Interface Sections
+- Model Information - Device, classes, parameters
+- Image Classification - Upload and classify images
+- Training Results - Visualization of FL performance
+- Raw Data - Access to training logs
+
+## 📊 Assignment Deliverables Status
+
+### ✅ COMPLETED
+- FL Simulation Code - Working with ThreadPoolExecutor
+- Non-IID Data Distribution - Visualization saved
+- Model Training - 73.40% accuracy achieved
+- Training Data CSV - All required columns present
+- Streamlit Web App - Working locally
+
+### 🔄 IN PROGRESS (Final Steps)
+- Docker Container - Needs testing and deployment
+- Chameleon Deployment - Remote access setup
+- IEEE Report - 2-page paper with three required figures
+- Final Packaging - ZIP file with all components
+
+## 🕒 Remaining Timeline (Due Oct 6, 11:59 PM)
+
+### Priority 1 (Next 2 hours): Docker & Deployment
+- Fix Dockerfile for inference-only container
+- Test Docker build and run locally
+- Deploy on Chameleon with floating IP
+- Verify remote access and take screenshots
+
+### Priority 2 (Next 3 hours): IEEE Report
+- Write 2-page report with required sections
+- Include three required figures:
+  - Learning curve (training accuracy/loss progression)
+  - Data distribution plot (non-IID visualization)
+  - Web application screenshot (successful inference)
+
+### Priority 3 (Final hour): Submission
+- Package source code, Dockerfile, README
+- Include CSV training data
+- Submit ZIP file under 10MB
+
+## 🐛 Known Working Components
+- Local FL Training: ✅ 73.40% accuracy achieved
+- Local Streamlit App: ✅ Inference working
+- Data Export: ✅ CSV with all required columns
+- Model Saving: ✅ AlexNet model saved properly
+
+## 📚 Technical Stack
+- Python 3.11 (verified working)
+- PyTorch: Model training and inference
+- Streamlit: Web interface
+- ThreadPoolExecutor: Concurrent FL simulation
+- Docker: Containerization for deployment
+- Chameleon Cloud: Remote deployment platform
+
+---
+
+**Course**: CS 595-003 Decentralized ML Systems  
+**Assignment**: HW2 - Federated Learning and AI Model Serving  
+**Instructor**: Dr. Nathaniel Hudson
+
+**Status**: Training ✅ Complete | Deployment 🔄 In Progress | Due: Oct 6, 11:59 PM
 
 ## 🌐 Chameleon Cloud Deployment
 
@@ -85,7 +275,6 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker $USER
 
-# Log out and back in for group changes to take effect
 exit
 ssh cc@<your-floating-ip>
 
@@ -96,8 +285,6 @@ docker --version
 #### 3. Deploy Application
 
 ```bash
-# Clone or upload your project to the Chameleon node
-# Option A: If using git
 git clone <your-repository-url>
 cd HW2
 
@@ -107,10 +294,10 @@ ssh cc@<your-floating-ip>
 cd HW2
 
 # Build Docker image
-docker build -t federated-learning-app .
+docker build -t federated-inference .
 
-# Run application (accessible from anywhere on the internet)
-docker run -d -p 8501:8501 --name fl-app federated-learning-app
+docker run -p 8501:8501 federated-inference
+
 
 # Check if container is running
 docker ps
@@ -122,7 +309,6 @@ docker logs fl-app
 #### 4. Access Application
 
 - **Streamlit**: `http://<your-floating-ip>:8501`
-- **Flask**: `http://<your-floating-ip>:5000` (if using Flask version)
 
 ### Important Deployment Notes
 

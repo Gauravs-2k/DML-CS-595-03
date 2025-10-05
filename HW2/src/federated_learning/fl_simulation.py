@@ -19,13 +19,13 @@ def main():
     """Main function to run the federated learning simulation"""
     # Configuration (meets assignment requirements)
     config = Config(
-        num_clients=64,              # Assignment prefers 64+ (minimum 16)
+        num_clients=16,              # Assignment prefers 64+ (minimum 16)
         dataset_name='CIFAR10',      # or 'CIFAR100'
         model_name='alexnet',        # or 'resnet18'
         max_workers=8,               # Adjust based on your system
         epochs_per_round=3,          # Reduced for faster training
         num_rounds=15,               # Adjust based on convergence
-        learning_rate=0.001
+        learning_rate=0.01
     )
 
     # Print configuration
