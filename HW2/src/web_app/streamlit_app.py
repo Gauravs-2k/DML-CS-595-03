@@ -88,9 +88,8 @@ def load_model():
 def load_training_data():
     """Load training results for visualization"""
     try:
-        # Try to load detailed training data
-        if os.path.exists('data/training_results.csv'):
-            df = pd.read_csv('data/training_results.csv')
+        if os.path.exists('result/training_results.csv'):
+            df = pd.read_csv('result/training_results.csv')
             return df
         return None
     except Exception as e:

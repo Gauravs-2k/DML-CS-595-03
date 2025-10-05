@@ -1,30 +1,35 @@
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies for PyTorch
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
+# Copy requirements and install CPU-only PyTorch
 COPY requirements.txt .
+
+# Install PyTorch CPU-only (MAJOR SIZE REDUCTION)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Install other dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your trained model and app files
-COPY models/ ./models/
+# Copy essential files including sample images and training data
 COPY src/web_app/streamlit_app.py ./
-COPY static/ ./static/
-COPY data/ ./data/
+COPY models/federated_model_alexnet_CIFAR10.pth ./models/
 COPY test/ ./test/
-# Expose only Streamlit port
+COPY result/ ./result/
+COPY static/ ./static/
+
+# Expose port
 EXPOSE 8501
 
-# Set environment variables
-ENV PYTHONPATH=/app
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Single responsibility: Only run the inference app
+# Run app
 CMD ["streamlit", "run", "streamlit_app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
