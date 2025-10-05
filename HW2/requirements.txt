@@ -26,7 +26,3 @@ tqdm>=4.64.0
 
 # For better datetime handling
 python-dateutil>=2.8.0
-
-# Optional: for better performance
-# torch-audio  # if needed for additional data processing
-# scikit-learn  # for additional metrics/utilities

@@ -1,9 +1,3 @@
-"""
-Data Handler Module for Federated Learning
-
-This module handles dataset loading, partitioning, and visualization for federated learning.
-"""
-
 import numpy as np
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
@@ -14,19 +8,20 @@ import os
 
 
 class DataHandler:
-    """Handles dataset loading, partitioning, and visualization for federated learning"""
 
     def __init__(self, dataset_name: str = "CIFAR10", num_clients: int = 64):
+        # setting dataset and client parameters
         self.dataset_name = dataset_name
         self.num_clients = num_clients
         self.num_classes = 10 if dataset_name == "CIFAR10" else 100
 
-        # Initialize datasets
+        # initializing data attributes
         self.train_dataset = None
         self.test_dataset = None
         self.test_loader = None
         self.client_data = {}
 
+        # defining transforms
         self.train_transform = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
@@ -39,10 +34,7 @@ class DataHandler:
         ])
 
     def setup_data(self):
-        """Setup and partition the dataset for federated learning"""
-        print("Setting up data...")
-
-        # Load dataset
+        # loading datasets based on name
         if self.dataset_name == "CIFAR10":
             self.train_dataset = datasets.CIFAR10(
                 root='./data', train=True, download=True, transform=self.train_transform
@@ -58,10 +50,10 @@ class DataHandler:
                 root='./data', train=False, download=True, transform=self.test_transform
             )
 
-        # Create test loader
+        # creating test loader
         self.test_loader = DataLoader(self.test_dataset, batch_size=128, shuffle=False)
 
-        # Partition data among clients (non-IID)
+        # creating non-iid partitions
         self._create_non_iid_partitions()
 
         print(f"Data setup complete. {len(self.train_dataset)} training samples, "
@@ -70,18 +62,16 @@ class DataHandler:
         return self.train_dataset, self.test_dataset, self.test_loader, self.client_data
 
     def _create_non_iid_partitions(self):
-        """Create non-IID data partitions for clients"""
-        print("Creating non-IID data partitions...")
-
-        # Get labels for all training data
+        # extracting labels from training dataset
         labels = np.array([self.train_dataset[i][1] for i in range(len(self.train_dataset))])
 
-        # Group indices by class
+        # grouping indices by class
         class_indices = {i: np.where(labels == i)[0] for i in range(self.num_classes)}
 
-        # Create non-IID distribution using Dirichlet distribution
+        # initializing client data indices
         client_data_indices = defaultdict(list)
 
+        # distributing data across clients non-iid
         for class_id in range(self.num_classes):
             proportions = np.random.dirichlet(np.repeat(0.5, self.num_clients))
             class_data = class_indices[class_id]
@@ -96,6 +86,7 @@ class DataHandler:
                     client_data_indices[client_id].extend(class_data[start_idx:end_idx])
                 start_idx = end_idx
 
+        # handling empty clients
         empty_clients = [cid for cid, indices in client_data_indices.items() if len(indices) == 0]
         if empty_clients:
             donor_clients = sorted(
@@ -110,6 +101,7 @@ class DataHandler:
                         client_data_indices[empty_client].append(donor_indices.pop())
                         break
 
+        # creating subset for each client
         self.client_data = {}
         for client_id in range(self.num_clients):
             self.client_data[client_id] = Subset(
@@ -117,10 +109,11 @@ class DataHandler:
                 client_data_indices[client_id]
             )
 
+        # visualizing data distribution
         self._visualize_data_distribution(client_data_indices)
 
     def _visualize_data_distribution(self, client_data_indices):
-        """Visualize the data distribution across clients"""
+        # creating distribution matrix
         distribution_matrix = np.zeros((self.num_clients, self.num_classes))
 
         for client_id in range(self.num_clients):
@@ -129,6 +122,7 @@ class DataHandler:
                 label = self.train_dataset[idx][1]
                 distribution_matrix[client_id, label] += 1
 
+        # plotting heatmap
         plt.figure(figsize=(12, 8))
         sns.heatmap(distribution_matrix,
                    xticklabels=range(self.num_classes),
@@ -140,7 +134,7 @@ class DataHandler:
         plt.ylabel('Client ID')
         plt.tight_layout()
 
-        # Ensure static directory exists
+        # saving plot
         os.makedirs('static', exist_ok=True)
         plt.savefig('static/data_distribution.png', dpi=300, bbox_inches='tight')
         plt.close()
@@ -148,7 +142,6 @@ class DataHandler:
         print("Data distribution visualization saved to 'static/data_distribution.png'")
 
     def get_client_data_info(self):
-        """Get information about client data distribution"""
         client_info = {}
         for client_id, subset in self.client_data.items():
             client_info[client_id] = {
@@ -158,7 +151,6 @@ class DataHandler:
         return client_info
 
     def _get_class_distribution(self, subset):
-        """Get class distribution for a subset"""
         labels = [self.train_dataset[idx][1] for idx in subset.indices]
         unique, counts = np.unique(labels, return_counts=True)
         return dict(zip(unique, counts))
