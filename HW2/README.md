@@ -7,7 +7,7 @@ This project implements a federated learning simulation for image classification
 - **Python Version**: 3.12.2 (verified with `python --version`)
 - **Operating System**: Linux/macOS/Windows
 - **RAM**: Minimum 8GB recommended
-- **GPU**: Optional, but recommended for faster training
+- **GPU**: Optional, but needed for training
 
 ## Environment Setup
 
@@ -84,18 +84,20 @@ Access the application at: http://localhost:8501
 # SSH into your Chameleon node
 ssh -i your-key.pem ubuntu@<chameleon-node-ip>
 
-# Clone and setup the project (same as local setup)
+
+# Clone and setup the project
 git clone https://github.com/Gauravs-2k/DML-CS-595-03.git
 cd DML-CS-595-03/HW2
+sudo apt install python3-venv
 
 # Create and activate virtual environment
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run federated learning simulation (if needed)
+# Run federated learning simulation
 python src/federated_learning/fl_simulation.py
 ```
 
