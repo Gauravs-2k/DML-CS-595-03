@@ -1,6 +1,6 @@
 # Federated Learning Image Classification Project
 
-This project implements a federated learning simulation for image classification using CIFAR-10 dataset with a web interface for model inference. The implementation includes non-IID data distribution, multi-threaded training, comprehensive logging, and deployment capabilities.
+This paper presents a comprehensive implementation of federated learning for image classification using the CIFAR-10 dataset with non-IID data distribution across simulated devices. The process incorporates multi-threaded training using ThreadPoolExecutor, AlexNet neural network adaptation, and a Streamlit-based web application for model inference. The federated learning simulation employs 16 clients with Dirichlet-based non-IID data partitioning, achieving approximately 73\% test accuracy while maintaining data privacy through distributed training. The web application enables remote model deployment accessible from any internet-connected device, with successful verification on Chameleon cloud infrastructure. 
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ This project implements a federated learning simulation for image classification
 
 **Option A: Extract the Submitted Zip File**
 ```bash
-unzip HW2_submission.zip
+unzip HW2.zip
 cd HW2
 ```
 
@@ -52,7 +52,7 @@ source venv/bin/activate
 python src/federated_learning/fl_simulation.py
 ```
 
-**What this does:**
+**Process:**
 - Trains an AlexNet model using federated learning
 - Uses 16 clients with non-IID data distribution
 - Runs for 15 rounds with 3 epochs per round
@@ -81,9 +81,9 @@ Access the application at: http://localhost:8501
 #### 1. Launch on Chameleon Node
 
 ```bash
-# SSH into your Chameleon node
-ssh -i your-key.pem ubuntu@<chameleon-node-ip>
 
+# SSH into Chameleon node
+ssh -i your-key.pem ubuntu@<chameleon-node-ip>
 
 # Clone and setup the project
 git clone https://github.com/Gauravs-2k/DML-CS-595-03.git
@@ -101,20 +101,13 @@ pip install -r requirements.txt
 python src/federated_learning/fl_simulation.py
 ```
 
-#### 2. Configure Security Group
-
-Ensure your Chameleon instance's security group allows inbound traffic on port 8501:
-- Protocol: TCP
-- Port Range: 8501
-- Source: 0.0.0.0/0 (or restrict to your IP for security)
-
-#### 3. Launch Web Application
+#### 2. Launch Web Application
 
 ```bash
 streamlit run src/web_app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
 ```
 
-#### 4. Access from Any Device
+#### 3. Access from Any Device
 
 - Get the public IP of your Chameleon node
 - Access the application at: `http://<chameleon-node-public-ip>:8501`
@@ -155,7 +148,6 @@ docker pull gauravs2k/federated-learning:latest
 # Run the container
 docker run -p 8501:8501 gauravs2k/federated-learning:latest
 ```
-
 **Option B: Build Locally**
 ```bash
 docker build -t federated-learning .
@@ -163,18 +155,3 @@ docker build -t federated-learning .
 docker run -p 8501:8501 federated-learning
 ```
 Access the application at: http://localhost:8501
-
-## Troubleshooting
-
-### Common Issues
-
-1. **CUDA out of memory**: Reduce batch size in `config.py`
-2. **Port already in use**: Change port with `--server.port <new_port>`
-3. **Dataset download fails**: Check internet connection, dataset will be cached after first download
-4. **Import errors**: Ensure all dependencies are installed with `pip install -r requirements.txt`
-
-### Performance Optimization
-
-- Use GPU if available (automatically detected)
-- Adjust `max_workers` in config based on CPU cores
-- Reduce `num_clients` or `epochs_per_round` for faster testing
