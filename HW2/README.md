@@ -15,7 +15,7 @@ This paper presents a comprehensive implementation of federated learning for ima
 
 **Option A: Extract the Submitted Zip File**
 ```bash
-unzip HW2.zip
+unzip Gaurav_Shivaprasad_HW2.zip
 cd HW2
 ```
 
@@ -105,23 +105,6 @@ python src/federated_learning/fl_simulation.py
 
 ```bash
 streamlit run src/web_app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
-```
-
-#### 3. Access from Any Device
-
-- Get the public IP of your Chameleon node
-- Access the application at: `http://<chameleon-node-public-ip>:8501`
-- The application will be accessible from any Internet-connected device
-
-**Note**: Keep the terminal session running. Use `screen` or `tmux` for persistent sessions:
-
-```bash
-sudo apt-get install screen
-
-screen -S fl-app
-
-streamlit run src/web_app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
-
 ```
 
 ## 📊 Results and Outputs
